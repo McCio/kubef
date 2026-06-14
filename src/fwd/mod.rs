@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    cnf::schema::Resource,
+    cnf::{self, schema::Resource},
     fwd::{
         clients::ClientPool,
         sockets::{LoopbackToken, SocketPool},
@@ -57,14 +57,30 @@ impl<'ctx> Forwarder<'ctx> {
         let policy = resource.policy.unwrap_or_default();
         let context = resource.context.as_deref().or(self.context);
 
-        let client = match context {
-            Some(context) => self.pool.get_or_insert(context).await?,
-            _ => self.pool.get_default().await?,
+        let config = cnf::extract().await?;
+
+        let (kubeconfig_context, alias_namespace) = match context {
+            Some(ctx) => match config.contexts.get(ctx) {
+                Some(alias) => (Some(alias.kubeconfig.as_str()), alias.namespace.as_deref()),
+                None => (Some(ctx), None),
+            },
+            None => (None, None),
         };
+
+        let client = match kubeconfig_context {
+            Some(ctx) => self.pool.get_or_insert(ctx).await?,
+            None => self.pool.get_default().await?,
+        };
+
+        let namespace = resource
+            .namespace
+            .as_deref()
+            .or(alias_namespace)
+            .unwrap_or("default");
 
         let server = socket.listen(1024)?;
 
-        let api = Api::<Pod>::namespaced(client.clone(), &resource.namespace);
+        let api = Api::<Pod>::namespaced(client.clone(), namespace);
         let api_ptr = Arc::new(api.clone());
 
         info!(
@@ -75,7 +91,7 @@ impl<'ctx> Forwarder<'ctx> {
 
         // TODO: How do we capture the error?
         let future = async move {
-            let selector = watcher::select(&client, resource).await?;
+            let selector = watcher::select(&client, resource, config).await?;
             let mut watcher = watcher::Watcher::new(api, &selector, policy).await?;
 
             loop {

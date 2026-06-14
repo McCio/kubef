@@ -9,6 +9,13 @@
         "null"
       ]
     },
+    "contexts": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ContextAlias"
+      },
+      "default": {}
+    },
     "groups": {
       "type": "object",
       "additionalProperties": {
@@ -30,6 +37,24 @@
     "groups"
   ],
   "$defs": {
+    "ContextAlias": {
+      "type": "object",
+      "properties": {
+        "kubeconfig": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kubeconfig"
+      ]
+    },
     "Ports": {
       "type": "object",
       "properties": {
@@ -67,7 +92,11 @@
           ]
         },
         "namespace": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         },
         "policy": {
           "anyOf": [
@@ -89,7 +118,6 @@
       "additionalProperties": false,
       "required": [
         "alias",
-        "namespace",
         "selector",
         "ports"
       ]

@@ -4,6 +4,13 @@ use ipnet::IpNet;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ContextAlias {
+    pub kubeconfig: String,
+    pub namespace: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
@@ -11,13 +18,16 @@ pub struct Config {
     pub groups: HashMap<String, Vec<Resource>>,
     #[schemars(with = "Option<String>")]
     pub loopback: Option<IpNet>,
+    #[serde(default)]
+    pub contexts: HashMap<String, ContextAlias>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Resource {
     pub alias: String,
-    pub namespace: String,
+    #[serde(default)]
+    pub namespace: Option<String>,
     pub context: Option<String>,
     pub policy: Option<SelectorPolicy>,
     pub selector: ResourceSelector,

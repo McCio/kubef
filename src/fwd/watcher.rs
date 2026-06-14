@@ -26,7 +26,10 @@ use kube::{
 use tokio::task::JoinHandle;
 use tracing::debug;
 
-use crate::cnf::schema::{Resource, ResourceSelector, SelectorPolicy};
+use crate::cnf::{
+    self,
+    schema::{Config, Resource, ResourceSelector, SelectorPolicy},
+};
 
 type Object = PartialObjectMeta<Pod>;
 
@@ -105,12 +108,13 @@ impl Drop for Watcher {
     }
 }
 
-pub async fn select(client: &Client, resource: &Resource) -> Result<Selector> {
+pub async fn select(client: &Client, resource: &Resource, config: &Config) -> Result<Selector> {
+    let namespace = cnf::resolve_namespace(resource, config);
     match &resource.selector {
         ResourceSelector::Label(labels) => Ok(Selector::from_iter(labels.clone())),
         ResourceSelector::Deployment(name) => {
             let deployment = client
-                .get::<Deployment>(name, &Namespace::from(resource.namespace.clone()))
+                .get::<Deployment>(name, &Namespace::from(namespace))
                 .await?;
 
             let selector = deployment
@@ -123,7 +127,7 @@ pub async fn select(client: &Client, resource: &Resource) -> Result<Selector> {
         }
         ResourceSelector::Service(name) => {
             let service = client
-                .get::<Service>(name, &Namespace::from(resource.namespace.clone()))
+                .get::<Service>(name, &Namespace::from(namespace))
                 .await?;
 
             let selector = service
