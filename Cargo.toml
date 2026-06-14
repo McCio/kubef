@@ -35,6 +35,7 @@ kube = { version = "2.0.1", features = [
     "unstable-runtime",
     "unstable-client",
 ] }
+strsim = "0.11.1"
 
 [build-dependencies]
 schemars = "1.0.4"
