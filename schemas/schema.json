@@ -30,6 +30,17 @@
         "string",
         "null"
       ]
+    },
+    "ports": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GlobalPorts"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "additionalProperties": false,
@@ -55,6 +66,38 @@
         "kubeconfig"
       ]
     },
+    "GlobalPorts": {
+      "type": "object",
+      "properties": {
+        "mapping": {
+          "$ref": "#/$defs/PortMapping"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "mapping"
+      ]
+    },
+    "PortMapping": {
+      "type": "string",
+      "enum": [
+        "container",
+        "service"
+      ]
+    },
+    "PortSpec": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        }
+      ]
+    },
     "Ports": {
       "type": "object",
       "properties": {
@@ -67,11 +110,18 @@
           "maximum": 65535,
           "minimum": 0
         },
+        "mapping": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PortMapping"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "remote": {
-          "type": "integer",
-          "format": "uint16",
-          "maximum": 65535,
-          "minimum": 0
+          "$ref": "#/$defs/PortSpec"
         }
       },
       "additionalProperties": false,

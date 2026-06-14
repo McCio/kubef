@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Args;
+use clap_complete::engine::ArgValueCompleter;
 use either::Either;
 
 use crate::{
@@ -9,7 +10,8 @@ use crate::{
 
 #[derive(Args)]
 pub struct ForwardCommandArguments {
-    #[arg(short, long, help = "The resource or group to forward")]
+    #[arg(value_name = "TARGET", help = "The resource or group to forward",
+          add = ArgValueCompleter::new(super::complete_targets))]
     pub target: String,
 
     #[arg(short, long, help = "The kubeconfig context to use")]
