@@ -5,6 +5,28 @@ use tokio::{sync::OnceCell, task};
 
 pub mod schema;
 
+/// Resolves the namespace for a resource using the following chain:
+/// 1. Explicit `resource.namespace`
+/// 2. Namespace from the context alias, if the resource's context names one
+/// 3. `"default"`
+#[must_use]
+pub fn resolve_namespace<'a>(
+    resource: &'a schema::Resource,
+    config: &'a schema::Config,
+) -> &'a str {
+    resource
+        .namespace
+        .as_deref()
+        .or_else(|| {
+            resource
+                .context
+                .as_deref()
+                .and_then(|ctx| config.contexts.get(ctx))
+                .and_then(|alias| alias.namespace.as_deref())
+        })
+        .unwrap_or("default")
+}
+
 static CNF: OnceCell<schema::Config> = OnceCell::const_new();
 
 pub async fn extract() -> Result<&'static schema::Config> {
