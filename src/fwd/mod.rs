@@ -89,6 +89,8 @@ impl<'ctx> Forwarder<'ctx> {
             resource.alias
         );
 
+        let pod_port = watcher::resolve_port(&client, resource, config).await?;
+
         // TODO: How do we capture the error?
         let future = async move {
             let selector = watcher::select(&client, resource, config).await?;
@@ -106,7 +108,6 @@ impl<'ctx> Forwarder<'ctx> {
                         let Some(pod) = watcher.get() else { continue };
 
                         let pod_name = pod.name_any();
-                        let pod_port = resource.ports.remote;
 
                         info!(
                             "Forwarding connection from {} to {}",

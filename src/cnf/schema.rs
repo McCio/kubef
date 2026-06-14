@@ -20,6 +20,29 @@ pub struct Config {
     pub loopback: Option<IpNet>,
     #[serde(default)]
     pub contexts: HashMap<String, ContextAlias>,
+    #[serde(default)]
+    pub ports: Option<GlobalPorts>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GlobalPorts {
+    pub mapping: PortMapping,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, Default, PartialEq, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum PortMapping {
+    #[default]
+    Container,
+    Service,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[serde(untagged)]
+pub enum PortSpec {
+    Named(String),
+    Number(u16),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
@@ -37,8 +60,9 @@ pub struct Resource {
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Ports {
-    pub remote: u16,
+    pub remote: PortSpec,
     pub local: Option<u16>,
+    pub mapping: Option<PortMapping>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy, Default, JsonSchema)]

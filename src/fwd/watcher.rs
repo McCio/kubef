@@ -8,9 +8,12 @@ use std::{
 
 use anyhow::{Context, Result};
 use futures::StreamExt;
-use k8s_openapi::api::{
-    apps::v1::Deployment,
-    core::v1::{Pod, Service},
+use k8s_openapi::{
+    api::{
+        apps::v1::Deployment,
+        core::v1::{Pod, Service},
+    },
+    apimachinery::pkg::util::intstr::IntOrString,
 };
 use kube::{
     Api, Client,
@@ -28,7 +31,7 @@ use tracing::debug;
 
 use crate::cnf::{
     self,
-    schema::{Config, Resource, ResourceSelector, SelectorPolicy},
+    schema::{Config, PortMapping, PortSpec, Resource, ResourceSelector, SelectorPolicy},
 };
 
 type Object = PartialObjectMeta<Pod>;
@@ -105,6 +108,76 @@ impl Watcher {
 impl Drop for Watcher {
     fn drop(&mut self) {
         self.handle.abort();
+    }
+}
+
+/// Resolve the concrete container port number for `resource`, consulting the Kubernetes API when
+/// needed (named ports or service mapping).
+pub async fn resolve_port(client: &Client, resource: &Resource, config: &Config) -> Result<u16> {
+    let effective_mapping = resource
+        .ports
+        .mapping
+        .or_else(|| config.ports.as_ref().map(|gp| gp.mapping))
+        .unwrap_or_default();
+
+    let namespace = cnf::resolve_namespace(resource, config);
+
+    match &resource.ports.remote {
+        PortSpec::Number(n) => {
+            if effective_mapping == PortMapping::Service {
+                let ResourceSelector::Service(name) = &resource.selector else {
+                    anyhow::bail!("service mapping requires service selector");
+                };
+
+                let service = client
+                    .get::<Service>(name, &Namespace::from(namespace))
+                    .await?;
+
+                let spec = service.spec.context("Service has no spec")?;
+                let port = spec
+                    .ports
+                    .as_deref()
+                    .and_then(|ports| ports.iter().find(|p| p.port == i32::from(*n)))
+                    .context("Service port not found")?;
+
+                resolve_target_port(
+                    port.target_port
+                        .as_ref()
+                        .context("Service port has no targetPort")?,
+                )
+            } else {
+                Ok(*n)
+            }
+        }
+        PortSpec::Named(name) => {
+            let ResourceSelector::Service(svc_name) = &resource.selector else {
+                anyhow::bail!("named port resolution requires service selector");
+            };
+
+            let service = client
+                .get::<Service>(svc_name, &Namespace::from(namespace))
+                .await?;
+
+            let spec = service.spec.context("Service has no spec")?;
+            let port = spec
+                .ports
+                .as_deref()
+                .and_then(|ports| ports.iter().find(|p| p.name.as_deref() == Some(name)))
+                .context("Named service port not found")?;
+
+            resolve_target_port(
+                port.target_port
+                    .as_ref()
+                    .context("Service port has no targetPort")?,
+            )
+        }
+    }
+}
+
+fn resolve_target_port(target: &IntOrString) -> Result<u16> {
+    match target {
+        IntOrString::Int(n) => Ok(u16::try_from(*n).context("targetPort out of u16 range")?),
+        IntOrString::String(_) => anyhow::bail!("named targetPort not yet supported"),
     }
 }
 
