@@ -189,10 +189,14 @@ impl Forwarder<'_> {
 
                 anyhow::bail!(e);
             }
-            Err(e) = tokio::io::copy_bidirectional(&mut connection, &mut upstream) => {
+            result = tokio::io::copy_bidirectional(&mut connection, &mut upstream) => {
                 forwarding.abort();
 
-                anyhow::bail!(e);
+                if let Err(e) = result {
+                    anyhow::bail!(e);
+                }
+
+                false
             }
         };
 
