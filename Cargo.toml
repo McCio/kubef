@@ -12,7 +12,7 @@ authors = [
 ]
 
 [dependencies]
-nanoid = "0.4.0"
+nanoid = "0.5"
 futures = "0.3.31"
 tracing = "0.1.41"
 schemars = "1.0.4"
