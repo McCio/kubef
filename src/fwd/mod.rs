@@ -80,8 +80,8 @@ impl<'ctx> Forwarder<'ctx> {
 
         let server = socket.listen(1024)?;
 
-        let api = Api::<Pod>::namespaced(client.clone(), namespace);
-        let api_ptr = Arc::new(api.clone());
+        let api_ptr = Arc::new(Api::<Pod>::namespaced(client.clone(), namespace));
+        let meta_api = Api::<kube::api::PartialObjectMeta<Pod>>::namespaced(client.clone(), namespace);
 
         info!(
             "Listening TCP on {} forwarded to {}",
@@ -94,7 +94,7 @@ impl<'ctx> Forwarder<'ctx> {
         // TODO: How do we capture the error?
         let future = async move {
             let selector = watcher::select(&client, resource, config).await?;
-            let mut watcher = watcher::Watcher::new(api, &selector, policy).await?;
+            let mut watcher = watcher::Watcher::new(meta_api, &selector, policy).await?;
 
             loop {
                 tokio::select! {
