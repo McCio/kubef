@@ -166,7 +166,6 @@ impl Forwarder<'_> {
     ) -> Result<()> {
         // Optimization
         connection.set_nodelay(true)?;
-        connection.set_linger(None)?;
 
         debug!("Opening upstream connection to {}", pod_name.as_ref());
 
