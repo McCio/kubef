@@ -21,9 +21,9 @@ use kube::{
     client::scope::Namespace,
     core::Selector,
     runtime::{
-        WatchStreamExt, predicates,
+        PredicateConfig, WatchStreamExt, predicates,
         reflector::{self, ReflectHandle, Store},
-        watcher::{self},
+        watcher,
     },
 };
 use tokio::task::JoinHandle;
@@ -45,18 +45,18 @@ pub struct Watcher {
 }
 
 impl Watcher {
-    pub async fn new(api: Api<Pod>, selector: &Selector, policy: SelectorPolicy) -> Result<Self> {
+    pub async fn new(api: Api<PartialObjectMeta<Pod>>, selector: &Selector, policy: SelectorPolicy) -> Result<Self> {
         let (store, writer) = reflector::store_shared(256);
 
         let config = watcher::Config::default().labels_from(selector);
         let subscriber = writer.subscribe().context("Failed to create subscriber")?;
 
         let handle = tokio::spawn(
-            watcher::metadata_watcher(api, config)
+            watcher::watcher(api, config)
                 .reflect(writer)
                 .default_backoff()
                 .applied_objects()
-                .predicate_filter(predicates::labels)
+                .predicate_filter(predicates::labels, PredicateConfig::default())
                 .for_each(|_| async {}),
         );
 
