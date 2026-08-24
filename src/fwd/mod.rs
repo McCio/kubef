@@ -15,7 +15,7 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::{Api, ResourceExt};
 use tokio::net::{TcpSocket, TcpStream};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::{Level, debug, info, instrument};
+use tracing::{Level, debug, info, instrument, warn};
 
 pub mod clients;
 pub mod proxy;
@@ -182,9 +182,9 @@ impl Forwarder<'_> {
 
         debug!("Upstream connection opened");
 
-        tokio::select! {
+        let cancelled = tokio::select! {
             biased;
-            () = token.cancelled() => {},
+            () = token.cancelled() => true,
             Some(e) = closer => {
                 forwarding.abort();
 
@@ -200,10 +200,16 @@ impl Forwarder<'_> {
         debug!("Going to gracefully drop upstream connection");
 
         drop(upstream);
+        forwarding.abort();
 
-        forwarding
-            .join()
-            .await
-            .context("Failed to conclude forward")
+        let result = forwarding.join().await;
+        if cancelled {
+            if let Err(e) = result {
+                warn!("Forward concluded with error on shutdown: {e}");
+            }
+            Ok(())
+        } else {
+            result.context("Failed to conclude forward")
+        }
     }
 }
