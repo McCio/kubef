@@ -190,8 +190,6 @@ impl Forwarder<'_> {
                 anyhow::bail!(e);
             }
             result = tokio::io::copy_bidirectional(&mut connection, &mut upstream) => {
-                forwarding.abort();
-
                 if let Err(e) = result {
                     anyhow::bail!(e);
                 }
@@ -205,14 +203,12 @@ impl Forwarder<'_> {
         drop(upstream);
         forwarding.abort();
 
-        let result = forwarding.join().await;
         if cancelled {
-            if let Err(e) = result {
+            if let Err(e) = forwarding.join().await {
                 warn!("Forward concluded with error on shutdown: {e}");
             }
-            Ok(())
-        } else {
-            result.context("Failed to conclude forward")
         }
+
+        Ok(())
     }
 }
