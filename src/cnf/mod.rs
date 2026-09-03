@@ -29,15 +29,18 @@ pub fn resolve_namespace<'a>(
 
 static CNF: OnceCell<schema::Config> = OnceCell::const_new();
 
-pub async fn extract() -> Result<&'static schema::Config> {
-    let xdg = xdg::BaseDirectories::with_prefix("kubef");
+/// Resolves the config file path: `KUBEF_CONFIG` env var, or `config.yaml`
+/// under the platform config dir (`~/.config/kubef` on unix,
+/// `%APPDATA%\kubef` on windows).
+pub fn config_path() -> Option<std::path::PathBuf> {
+    if let Ok(val) = env::var("KUBEF_CONFIG") {
+        return Some(std::path::PathBuf::from(val));
+    }
+    dirs::config_dir().map(|d| d.join("kubef").join("config.yaml"))
+}
 
-    let path = match env::var("KUBEF_CONFIG") {
-        Ok(val) => std::path::PathBuf::from(val),
-        Err(_) => xdg
-            .place_config_file("config.yaml")
-            .expect("Failed to create default config file"),
-    };
+pub async fn extract() -> Result<&'static schema::Config> {
+    let path = config_path().expect("Failed to resolve default config file path");
 
     let config = CNF
         .get_or_try_init(|| async {

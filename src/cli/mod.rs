@@ -55,11 +55,7 @@ fn preprocess_args() -> Vec<String> {
 }
 
 fn load_config_sync() -> Option<crate::cnf::schema::Config> {
-    let path = if let Ok(val) = std::env::var("KUBEF_CONFIG") {
-        std::path::PathBuf::from(val)
-    } else {
-        xdg::BaseDirectories::with_prefix("kubef").find_config_file("config.yaml")?
-    };
+    let path = crate::cnf::config_path()?;
     let file = std::fs::File::open(&path).ok()?;
     serde_yaml_ng::from_reader(file).ok()
 }

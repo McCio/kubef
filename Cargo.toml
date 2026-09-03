@@ -1,6 +1,6 @@
 [package]
 name = "kubef"
-version = "2.2.0"
+version = "2.2.1"
 edition = "2024"
 license = "MIT"
 readme = "README.md"
@@ -19,7 +19,7 @@ tracing = "0.1.41"
 schemars = "1.0.4"
 anyhow = "1.0.100"
 either = "1.15.0"
-xdg = "3.0.0"
+dirs = "6.0"
 
 ipnet = { version = "2.11.0", features = ["serde"] }
 serde = { version = "1.0.228", features = ["derive"] }
