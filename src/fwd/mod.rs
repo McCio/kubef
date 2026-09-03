@@ -81,7 +81,8 @@ impl<'ctx> Forwarder<'ctx> {
         let server = socket.listen(1024)?;
 
         let api_ptr = Arc::new(Api::<Pod>::namespaced(client.clone(), namespace));
-        let meta_api = Api::<kube::api::PartialObjectMeta<Pod>>::namespaced(client.clone(), namespace);
+        let meta_api =
+            Api::<kube::api::PartialObjectMeta<Pod>>::namespaced(client.clone(), namespace);
 
         info!(
             "Listening TCP on {} forwarded to {}",
@@ -203,10 +204,8 @@ impl Forwarder<'_> {
         drop(upstream);
         forwarding.abort();
 
-        if cancelled {
-            if let Err(e) = forwarding.join().await {
-                warn!("Forward concluded with error on shutdown: {e}");
-            }
+        if cancelled && let Err(e) = forwarding.join().await {
+            warn!("Forward concluded with error on shutdown: {e}");
         }
 
         Ok(())

@@ -1,7 +1,10 @@
 use std::process::ExitCode;
 
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::{CompleteEnv, engine::{ArgValueCompleter, CompletionCandidate}};
+use clap_complete::{
+    CompleteEnv,
+    engine::{ArgValueCompleter, CompletionCandidate},
+};
 use tracing::{error, level_filters::LevelFilter};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -55,8 +58,7 @@ fn load_config_sync() -> Option<crate::cnf::schema::Config> {
     let path = if let Ok(val) = std::env::var("KUBEF_CONFIG") {
         std::path::PathBuf::from(val)
     } else {
-        xdg::BaseDirectories::with_prefix("kubef")
-            .find_config_file("config.yaml")?
+        xdg::BaseDirectories::with_prefix("kubef").find_config_file("config.yaml")?
     };
     let file = std::fs::File::open(&path).ok()?;
     serde_yaml_ng::from_reader(file).ok()
@@ -71,7 +73,12 @@ fn complete_targets(_current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
         .values()
         .flat_map(|resources| resources.iter())
         .map(|r| CompletionCandidate::new(r.alias.clone()))
-        .chain(config.groups.keys().map(|name| CompletionCandidate::new(name.clone())))
+        .chain(
+            config
+                .groups
+                .keys()
+                .map(|name| CompletionCandidate::new(name.clone())),
+        )
         .collect()
 }
 

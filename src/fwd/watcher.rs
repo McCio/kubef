@@ -45,7 +45,11 @@ pub struct Watcher {
 }
 
 impl Watcher {
-    pub async fn new(api: Api<PartialObjectMeta<Pod>>, selector: &Selector, policy: SelectorPolicy) -> Result<Self> {
+    pub async fn new(
+        api: Api<PartialObjectMeta<Pod>>,
+        selector: &Selector,
+        policy: SelectorPolicy,
+    ) -> Result<Self> {
         let (store, writer) = reflector::store_shared(256);
 
         let config = watcher::Config::default().labels_from(selector);
