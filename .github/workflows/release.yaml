@@ -29,6 +29,8 @@ jobs:
     outputs:
       new_release_published: ${{ steps.release.outputs.new_release_published }}
       new_release_version: ${{ steps.release.outputs.new_release_version }}
+      tag_suffix: ${{ steps.tagsuffix.outputs.suffix }}
+      rust_version: ${{ steps.rustversion.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -40,6 +42,36 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Setup bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: Read Rust version from rust-toolchain.toml
+        id: rustversion
+        run: |
+          CHANNEL=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          [[ -n "$CHANNEL" ]] || { echo "no channel in rust-toolchain.toml" >&2; exit 1; }
+          echo "version=${CHANNEL}" >> "$GITHUB_OUTPUT"
+      - name: Derive tag suffix
+        id: tagsuffix
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          UPSTREAM=$(gh api "repos/${{ github.repository }}" --jq '.parent.owner.login // .owner.login' | tr '[:upper:]' '[:lower:]')
+          OWNER=$(gh api "repos/${{ github.repository }}" --jq '.owner.login' | tr '[:upper:]' '[:lower:]')
+          if [[ "$OWNER" != "$UPSTREAM" ]]; then
+            SUFFIX="-${OWNER}"
+          else
+            SUFFIX=""
+          fi
+          echo "suffix=${SUFFIX}" >> "$GITHUB_OUTPUT"
+          jq --arg tf "v\${version}${SUFFIX}" '.tagFormat = $tf' .releaserc.json > .releaserc.tmp.json
+          mv .releaserc.tmp.json .releaserc.json
+          echo "tagFormat: v\${version}${SUFFIX}"
+          # Forks carry upstream's squash-merge commits, whose associated PRs
+          # live in the upstream repo — commenting/labeling them 404s. Disable
+          # those steps there.
+          if [[ -n "$SUFFIX" ]]; then
+            jq '.plugins |= map(if . == "@semantic-release/github" then ["@semantic-release/github", {successComment: false, releasedLabels: false, failComment: false}] else . end)' \
+              .releaserc.json > .releaserc.tmp.json
+            mv .releaserc.tmp.json .releaserc.json
+          fi
       - name: Bootstrap or release
         id: release
         env:
@@ -47,11 +79,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git checkout -B main
+          SUFFIX="${{ steps.tagsuffix.outputs.suffix }}"
 
-          if [[ -z "$(git tag -l 'v*')" ]]; then
-            gh release create v0.1.0 \
+          if [[ -z "$(git tag -l "v*${SUFFIX}")" ]]; then
+            gh release create "v0.1.0${SUFFIX}" \
               --target "${{ github.event.workflow_run.head_sha }}" \
-              --title "v0.1.0" \
+              --title "v0.1.0${SUFFIX}" \
               --notes "Initial release."
             echo "new_release_published=true" >> "$GITHUB_OUTPUT"
             echo "new_release_version=0.1.0" >> "$GITHUB_OUTPUT"
@@ -74,6 +107,8 @@ jobs:
     if: needs.semantic-release.outputs.new_release_published == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    env:
+      RUST_VERSION: ${{ needs.semantic-release.outputs.rust_version }}
     strategy:
       fail-fast: false
       matrix:
@@ -100,11 +135,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: v${{ needs.semantic-release.outputs.new_release_version }}
+          ref: v${{ needs.semantic-release.outputs.new_release_version }}${{ needs.semantic-release.outputs.tag_suffix }}
       - name: Install Rust
         uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
         with:
+          toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.target }}
+      - name: Stamp release version
+        run: |
+          VERSION="${{ needs.semantic-release.outputs.new_release_version }}"
+          sed "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml > Cargo.toml.tmp
+          mv Cargo.toml.tmp Cargo.toml
+          grep '^version' Cargo.toml
       - name: Setup cache
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
@@ -163,5 +205,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "v${{ needs.semantic-release.outputs.new_release_version }}" \
+          gh release upload -R "${{ github.repository }}" "v${{ needs.semantic-release.outputs.new_release_version }}${{ needs.semantic-release.outputs.tag_suffix }}" \
             artifacts/*
