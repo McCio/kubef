@@ -12,6 +12,9 @@ pub fn generate_schema(outdir: &OsString) {
 }
 
 fn main() {
+    // Without this cargo rescans the whole package, and writing ./schemas/schema.json below makes every build dirty.
+    println!("cargo:rerun-if-changed=src/config/schema.rs");
+
     let outdir = OsString::from("./schemas");
 
     fs::create_dir_all(&outdir).unwrap();
